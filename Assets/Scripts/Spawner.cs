@@ -1,70 +1,48 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Pool;
 
-public class Spawner : MonoBehaviour
+public abstract class Spawner<T> : MonoBehaviour where T : MonoBehaviour
 {
-    [SerializeField] private Cube _cube;
-    [SerializeField] private Transform _pointSpawner;
+    [SerializeField] protected T Object;
+    [SerializeField] protected Transform PointSpawner;
 
-    private ObjectPool<Cube> _poolCubes;
-    private int _defaultCapacity = 20;
-    private int _maxSize = 100;
-    private Coroutine _spawningCoroutine;
+    protected int _defaultCapacity = 20;
+    protected int _maxSize = 100;
+    protected ObjectPool<T> _poolObjects;
+
+    private int _quntitySpawn;
+
+    public int ActiveObjects { get; private set; }
+
+    public int GetQuntitySpawn() => _quntitySpawn;
 
     private void Awake()
     {
-        _poolCubes = new ObjectPool<Cube>(
-            createFunc: () => CreatePoolCubes(),
-            actionOnGet: (cube) => TakeCube(cube),
-            actionOnRelease: (cube) => cube.gameObject.SetActive(false),
-            actionOnDestroy: (cube) => Destroy(cube),
+        _poolObjects = new ObjectPool<T>(
+            createFunc: () => CreatePoolObjects(),
+            actionOnGet: (T) => TakeObject(T),
+            actionOnRelease: (T) => T.gameObject.SetActive(false),
+            actionOnDestroy: (T) => Destroy(T),
             collectionCheck: true,
             defaultCapacity: _defaultCapacity,
             maxSize: _maxSize);
     }
 
-    private void Start()
-    {
-        if (_spawningCoroutine == null)
-        {
-            StartCoroutine(SpawningCubes());
-        }
+    private void Update()
+    { 
+        ActiveObjects = _poolObjects.CountActive;
     }
 
-    private Cube CreatePoolCubes()
-    {
-        Cube cube = Instantiate(_cube);
-        cube.CubeDestroyed += ReturnCubeToPool;
-        cube.gameObject.SetActive(false);
+    protected abstract T CreatePoolObjects();
 
-        return cube;
+    protected virtual void TakeObject(T figure)
+    {
+        _quntitySpawn++;
+        figure.gameObject.SetActive(true);
     }
 
-    private void TakeCube(Cube cube)
+    protected virtual void ReturnObjectToPool(T figure)
     {
-        int minValue = -9;
-        int maxValue = 9;
-
-        cube.transform.position = new Vector3(Random.Range(minValue, maxValue), _pointSpawner.transform.position.y, Random.Range(minValue, maxValue));
-        cube.gameObject.SetActive(true);
-    }
-
-    private void ReturnCubeToPool(Cube cube)
-    {
-        _poolCubes.Release(cube);
-    }
-
-    private IEnumerator SpawningCubes()
-    {
-        float timeToDelay = 0.1f;
-
-        var delay = new WaitForSeconds(timeToDelay);
-
-        while (true)
-        {
-            yield return delay;
-            _poolCubes.Get();
-        }
+        _poolObjects.Release(figure);
     }
 }
